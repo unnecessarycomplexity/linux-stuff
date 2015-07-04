@@ -1,0 +1,287 @@
+create bootable usb (arch-linux)
+HDD setup
+
+view HDD to partition
+#lsblk -f
+
+partition selected disk
+#fdisk /dev/sda
+fdisk> p //view disk partition
+set our boot partition
+fdisk> n //create new partition
+fdisk> p //primary
+fdisk> 1 // select partition nos.
+fdisk> <enter> //enter default first sector
+fdisk> +500M //enter last sector ( add 40MB to our first sector (0MB))
+fdisk> a //toggle a bootable flag
+fdisk> 1 //select newly created boot partition
+
+set our lvm partition
+fdisk> n
+fdisk> p
+fdisk> 2
+fdisk> <enter>
+fdisk> +10GB
+fdisk> t //change partition type
+fdisk> 2 //select partition nos
+fdisk> l //list all types
+fdisk> 8e //select Linux LVM partition
+
+fdisk> w //save partition layout
+fdisk> partprobe //inform OS of partition table changes
+
+configure lvm partition
+#lvmdiskscan //check for valid physical volume (this step is optional, as long as you've successfully created lvm partition
+                else go back and repartition again your disk.)
+#pvcreate /dev/sda2 //create physical volume(remember the 2nd partition where we set it's partition type to lvm(8e))
+#pvdisplay //show our physical volume(it's not necessarily, it's an extra step to convince myself everythings is fine.)
+
+create volume group and used our pv(/dev/sda2)
+#vgcreate vg_webapps /dev/sda2  
+
+OPTIONAL: you can check your volumegroup using this command,
+#vgdisplay
+
+let's create now our logical volumes
+lvcreate -L 100MB vg_webapps -n lv_root
+lvcreate -L 100MB vg_webapps -n lv_swap
+
+OPTIONAL: 
+#lvdisplay
+
+Set volume group as active 
+#vgscan //scan for any changes
+#vgchange -ay //set active 
+
+format logical volume
+mkfs.ext4 /dev/sda1 //format boot partitionm
+mkfs.ext4 /dev/mapper/vg_webapps-lv_root //format lv_root
+mkswap /dev/mapper/vg_webapps-lv_swap //format swap partition
+
+mount partition
+#mount /dev/mapper/vg_webapps-lv_root /mnt
+#mkdir /mnt/boot
+#mount /dev/sda1 /mnt/boot
+#swapon /dev/mapper/vg_webapps-lv_swap
+
+view our partition
+#lsblk /dev/sda
+
+backup mirrorlist
+#mv /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.bak
+
+download fresh mirrorlist
+wget http://www.archlinux.org/mirrorlist/?use_mirror_status=on -O /etc/pacman.d/mirrorlist
+#nano /etc/pacman.d/mirrorlist //uncomment server list to be used
+
+update pacman package list
+#pacman -Syy
+
+install base system
+#pacstrap -i /mnt base base-devel
+#<enter> //select all groups under base
+#<enter> //select all groups under base-devel
+
+generate fstab
+fstab tell system what each partition does and it's configuration
+#genfstab -U -p /mnt >> /mnt/etc/fstab 
+
+OPTIONAL: compare output of the 2 command below, check for mismatch UUID
+#lsblkid 
+#cat /etc/fstab
+
+chroot to /mnt before start configuring newly installed system
+#arch-chroot /mnt /bin/bash
+
+set locales
+#nano /etc/locale.gen //uncomment "en_US.UTF-8 UTF-8"
+
+generate locale
+#locale-gen
+
+generate local.conf
+#echo LANG=en_US.UTF-8 > /etc/locale.conf
+set LANG var
+#export LANG=en_US.UTF-8
+
+OPTIONAL: check timezone dir to avoid wrong spelling
+#ls /usr/share/zoneinfo
+
+set timezone
+#ln -s /usr/share/zoneinfo/America/New_York /etc/localtime
+
+set system clock
+#hwclock --systohc --utc
+
+set hostname (computer name)
+#echo USER-PC > /etc/hostname
+
+edit hosts file to map computer name to localhost
+#nano /etc/hosts
+
+<ip-address>   <hostname.domain.org>   <hostname>
+127.0.0.1       localhost.localdomain   localhost  USER-PC
+::1             localhost.localdomain   localhost
+
+find mac address
+#ip link //"ip addr" command can also be use
+#>enp0s15: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+
+set network card to run on boot
+#systemctl enable dhcpcd@enp0s15
+
+ STEPS NEEDED IF WE'RE USING LVM LIKE I DID 
+edit mkinitcpio.conf to add lvm2 
+#nano /etc/mkinitcpio.conf
+
+add lvm2 
+HOOKS="base udev autodetect modconf block lvm2 filesystems keyboard fsck"
+ END 
+
+change dir to /boot partition and generate ramdis
+#cd /boot
+#mkinitcpio -p linux //used preset conf
+
+set password for root account
+#passwd
+
+add another account since we're going to disable root access in tty for extra protection
+#useradd -m -g users -G audio,lp,optical,storage,video,games,power,scanner,wheel -s /bin/bash imAnotherUser
+change imAnotherUser password account
+#passwd imAnotherUser
+
+configure bootloader
+#nano /etc/lvm/lvm.conf
+
+change use_lvmetad value to avoid warning error "WARNING: Failed to connect to lvmetad. Falling back to internal scanning."
+#>use_lvmetad = 0
+
+install now our bootloader
+#pacman -S fuse grub lvm2 os-prober
+
+install grub
+#grub-install --target=i386-pc --recheck /dev/sda
+#grub-mkconfig -o /boot/grub/grub.cfg
+
+exit chroot and unmount all mounted devices
+#exit
+#umount /mnt/boot
+#umount /mnt
+
+shutdown and removed arch-linux bootable usb
+#shutdown -h now
+
+start system unit and input to the terminal the root login credentials based you've set earlier
+check for internet connectivity
+#ping -c 3 www.google.com
+
+check for pacman update
+#pacman -Syu
+
+Edit sudoers list 
+#visudo
+
+add all users under of wheel group to our sudoers list by uncommenting the following 
+#>%wheel ALL=(ALL) ALL
+
+install basic x window system
+#pacman -S xorg-server xorg-xinit xorg-server-utils xorg-twm xorg-xclock xterm
+
+install some good fonts
+pacman -S ttf-dejavu  ttf-droid  ttf-inconsolata
+
+install driver
+#pacman -S xf86-input-keyboard xf86-input-mouse xf86-input-libinput xf86-input-fbdev xf86-input-nouveau xf86-video-vesa
+
+install 3d Support
+#pacman -S mesa mesa-demos
+
+install audio
+#pacman -S alsa-utils alsa-plugins
+
+install i3
+#pacman -S i3-wm i3lock i3status dmenu
+
+CUSTOMIZING:
+1.Virtual Terminal Appearance - Edit /etc/default/grub
+
+First, you will find GRUB_DEFAULT=0 at the top of the file. Change it to:
+
+GRUB_DEFAULT=saved
+
+so that GRUB will remember the last kernel you boosted from and make it the default entry next time you boot. Then you also need to add the following lines at the end of the file:
+
+GRUB_SAVEDEFAULT=true
+GRUB_DISABLE_SUBMENU=y
+
+Optionally, while you’re editing this file, you can make your virtual console – the text-based command line before you start Xfce – a little bigger. Change GRUB_GFXMODE=auto to:
+
+GRUB_GFXMODE=1024x768x32
+
+And make sure the following line is there and not commented out:
+
+GRUB_GFXPAYLOAD_LINUX=keep
+
+Also uncomment the following lines to have the menu screen in color:
+
+GRUB_COLOR_NORMAL="light-blue/black"
+GRUB_COLOR_HIGHLIGHT="light-cyan/blue"
+
+After you modified /etc/default/grub, regenerate the GRUB configuration by running:
+
+sudo grub-mkconfig -o /boot/grub/grub.cfg
+
+
+
+
+
+PERFORMANCE TUNING:
+
+Swappiness can have a value between 0 and 100, the default value is 60. Setting this parameter to a low value will reduce swapping from RAM, and is known to improve responsiveness on many systems.
+
+To check the current swappiness value:
+
+$ cat /proc/sys/vm/swappiness
+To temporarily set the swappiness value:
+
+# sysctl vm.swappiness=10
+
+To set permanentyly
+#nano /etc/sysctl.d/99-sysctl.conf
+#>vm.swappiness=10
+
+
+
+
+ENCOUNTERED ERROR:
+1. Pacman update (pacman -syyu) stop booting to my lvm root partition
+solution: load device mapper kernel modules once dropped into recovery shell
+#modprobe -a dm-mod
+regenerate the ramdisk
+cd /boot
+mkinitcpio -p linux
+
+
+
+
+OTHERS:
+DISABLE UUID
+use old device mapping name instead of UUID 
+edit /etc/fstab and changed it's file system
+
+FROM
+#>UUID=1f8742d6-ecd5-4dd5-a7db-89615288500d		/home 	ext4	rw,relatime,data=ordered	0 2
+TO
+#>/dev/sda1										/home 	ext4	rw,relatime,data=ordered	0 2
+
+uncomment the ff. from /etc/default/grub
+#>GRUB_DISABLE_LINUX_UUID=true
+regenerate new grub configuration
+#grub-mkconfig -o /boot/grub/grub.cfg
+
+BOOTING WRONG PARTITION/MOUNTING WRONG PARTITION
+check UUID from fstab if consistent to blkid result
+#cat /etc/fstab
+#blkid
+correct incorrect UUID in fstab if any then regenerate grub configuration
+#grub-mkconfig -o /boot/grub/grub.cfg
