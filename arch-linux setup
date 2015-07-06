@@ -229,11 +229,7 @@ you can check your keyboard code by using "xev" command
 >bindsym mod4+KP_Subtract exec amixer set Master 5%- //WIN+- for 5% volume decrease
 >bindcode mod4+119 exec i3-lock -c 00000  //WIN+DEL for i3 lock
 >bindcode mod4+104 exec amixer -D pulse set Master 1+ toggle //toggle mute volume
-
-
-
-
-
+>bindsym Print exec scrot -e 'mv $f ~/Pictures/Screenshots' //bind scrot app to print screen button
 save
 
 
