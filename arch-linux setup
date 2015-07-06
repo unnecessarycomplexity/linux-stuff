@@ -224,9 +224,11 @@ replace set $mod Mod1 into
 set $mod Mod1+Mod3
 
 Add custom keybinding for our volume
-bindsym mod4+KP_Add exec amixer set Master 5%+
-bindsym mod4+KP_Subtract exec amixer set Master 5%-
-
+you can check your keyboard code by using "xev" command
+>bindsym mod4+KP_Add exec amixer set Master 5%+ //WIN++ for 5% volume increase 
+>bindsym mod4+KP_Subtract exec amixer set Master 5%- //WIN+- for 5% volume decrease
+>bindcode mod4+119 exec i3-lock -c 00000  //WIN+DEL for i3 lock
+>bindcode mod4+104 exec amixer -D pulse set Master 1+ toggle //toggle mute volume
 
 
 
