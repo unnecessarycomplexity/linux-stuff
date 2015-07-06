@@ -202,6 +202,35 @@ install audio
 install i3
 #pacman -S i3-wm i3lock i3status dmenu
 
+change modifier key
+use LEFT ALT + SPACE as my modifier key
+View current modifier
+#xmodmap 
+view keyboard layout
+#xmodmap -pke
+add space to mod3
+#xmodmap -e 'add mod3 = space'
+remove Alternate right key
+#xmodmap -e 'remove mod1 = Alt_R'
+
+
+Customize i3 configuration by modifying ~/.i3/config
+I am going to move .i3/config to ~/.config/i3/config. 
+This way, each app configuration is organize into 1 location
+edit i3 config
+
+#vi ~/.config/i3/config
+replace set $mod Mod1 into
+set $mod Mod1+Mod3
+save
+
+
+
+
+
+
+
+
 CUSTOMIZING:
 1.Virtual Terminal Appearance - Edit /etc/default/grub
 
