@@ -322,3 +322,8 @@ check UUID from fstab if consistent to blkid result
 #blkid
 correct incorrect UUID in fstab if any then regenerate grub configuration
 #grub-mkconfig -o /boot/grub/grub.cfg
+
+
+
+
+329
